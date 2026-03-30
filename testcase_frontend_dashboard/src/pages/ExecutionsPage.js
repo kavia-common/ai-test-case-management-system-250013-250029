@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { createManualExecution, getExecutionLogs, listExecutions, triggerAutomationRun } from "../api/executions";
+import { listProjects } from "../api/projects";
 
 // PUBLIC_INTERFACE
 export default function ExecutionsPage() {
   /** Execution management (manual + automation triggers) with log viewer. */
   const [items, setItems] = useState([]);
   const [status, setStatus] = useState({ loading: true, error: null });
+  const [projectId, setProjectId] = useState("");
 
   const [testCaseId, setTestCaseId] = useState("");
   const [result, setResult] = useState("passed");
@@ -22,7 +24,16 @@ export default function ExecutionsPage() {
   async function load() {
     setStatus({ loading: true, error: null });
     try {
-      const res = await listExecutions();
+      let pid = projectId;
+      if (!pid) {
+        const pr = await listProjects();
+        const first = (pr?.projects || pr || [])[0];
+        pid = first?.id || first?._id || "";
+        setProjectId(pid);
+      }
+      if (!pid) throw new Error("No projects available. Create a project first.");
+
+      const res = await listExecutions({ projectId: pid });
       setItems(res?.executions || res || []);
       setStatus({ loading: false, error: null });
     } catch (e) {
@@ -41,6 +52,7 @@ export default function ExecutionsPage() {
     setCreating(true);
     try {
       await createManualExecution({
+        projectId,
         testCaseId: testCaseId.trim(),
         result,
         notes: notes.trim() || null
@@ -60,7 +72,7 @@ export default function ExecutionsPage() {
 
     setAutoRunning(true);
     try {
-      await triggerAutomationRun({ testCaseId: autoCaseId.trim() });
+      await triggerAutomationRun({ projectId, testcaseId: autoCaseId.trim(), runType: "playwright" });
       await load();
     } catch (e) {
       setStatus({ loading: false, error: e?.message || "Failed to trigger automation run." });

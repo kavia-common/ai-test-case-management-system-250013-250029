@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createTestCase, deleteTestCase, listTestCases } from "../api/testcases";
+import { listProjects } from "../api/projects";
 
 function parseTags(input) {
   return input
@@ -10,9 +11,10 @@ function parseTags(input) {
 
 // PUBLIC_INTERFACE
 export default function TestCasesPage() {
-  /** Test case CRUD page with tags and filtering. */
+  /** Test case CRUD page with tags and filtering (project-scoped). */
   const [items, setItems] = useState([]);
   const [status, setStatus] = useState({ loading: true, error: null });
+  const [projectId, setProjectId] = useState("");
 
   const [filterTag, setFilterTag] = useState("");
   const [filterQ, setFilterQ] = useState("");
@@ -23,16 +25,33 @@ export default function TestCasesPage() {
   const [tags, setTags] = useState("");
   const [creating, setCreating] = useState(false);
 
+  const ensureProject = useCallback(async () => {
+    if (projectId) return projectId;
+
+    const pr = await listProjects();
+    const first = (pr?.projects || pr || [])[0];
+    const pid = first?.id || first?._id || "";
+    setProjectId(pid);
+    return pid;
+  }, [projectId]);
+
   const load = useCallback(async () => {
     setStatus({ loading: true, error: null });
     try {
-      const res = await listTestCases({ tag: filterTag || undefined, q: filterQ || undefined });
+      const pid = await ensureProject();
+      if (!pid) throw new Error("No projects available. Create a project first.");
+
+      const res = await listTestCases({
+        projectId: pid,
+        tag: filterTag || undefined,
+        q: filterQ || undefined
+      });
       setItems(res?.testcases || res || []);
       setStatus({ loading: false, error: null });
     } catch (e) {
       setStatus({ loading: false, error: e?.message || "Failed to load test cases." });
     }
-  }, [filterQ, filterTag]);
+  }, [ensureProject, filterQ, filterTag]);
 
   useEffect(() => {
     load();
@@ -44,12 +63,17 @@ export default function TestCasesPage() {
 
     setCreating(true);
     try {
+      const pid = await ensureProject();
+      if (!pid) throw new Error("No projects available. Create a project first.");
+
       await createTestCase({
+        projectId: pid,
         title: title.trim(),
         steps: steps.trim(),
         expectedResult: expected.trim(),
         tags: parseTags(tags)
       });
+
       setTitle("");
       setSteps("");
       setExpected("");
@@ -127,7 +151,16 @@ export default function TestCasesPage() {
               <button className="btn btnPrimary" type="submit" disabled={creating}>
                 {creating ? "Creating…" : "Create"}
               </button>
-              <button className="btn" type="button" onClick={() => { setTitle(""); setSteps(""); setExpected(""); setTags(""); }}>
+              <button
+                className="btn"
+                type="button"
+                onClick={() => {
+                  setTitle("");
+                  setSteps("");
+                  setExpected("");
+                  setTags("");
+                }}
+              >
                 Reset
               </button>
             </div>
@@ -162,7 +195,9 @@ export default function TestCasesPage() {
           </div>
 
           <div className="actions">
-            <button className="btn" type="button" onClick={load}>Refresh</button>
+            <button className="btn" type="button" onClick={load}>
+              Refresh
+            </button>
           </div>
 
           <table className="table" aria-label="Test cases table">
@@ -176,7 +211,9 @@ export default function TestCasesPage() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="3" className="pillMono">No test cases found.</td>
+                  <td colSpan="3" className="pillMono">
+                    No test cases found.
+                  </td>
                 </tr>
               ) : (
                 filtered.map((tc) => (

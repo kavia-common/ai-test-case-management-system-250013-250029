@@ -4,7 +4,7 @@ import { getToken, clearAuthStorage } from "../utils/storage";
  * API base URL is configured via env var.
  * Ask orchestrator/user to set REACT_APP_API_BASE_URL in .env for this container.
  */
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.API_BASE || "";
 
 /**
  * Normalized API error shape.

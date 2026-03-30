@@ -1,15 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getDashboard } from "../api/dashboard";
 import { Pie, PieChart, ResponsiveContainer, Tooltip, Cell, BarChart, Bar, XAxis, YAxis } from "recharts";
+import { getDashboard } from "../api/dashboard";
+import { listProjects } from "../api/projects";
 
 const COLORS = ["#2de2e6", "#ff2a6d", "#f9c80e", "#00f5d4"];
 
 // PUBLIC_INTERFACE
 export default function DashboardPage() {
-  /** Landing dashboard with KPIs + charts. */
+  /** Landing dashboard with KPIs + charts (project-scoped). */
   const [data, setData] = useState(null);
   const [status, setStatus] = useState({ loading: true, error: null });
+  const [projectId, setProjectId] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -17,13 +19,25 @@ export default function DashboardPage() {
     async function load() {
       setStatus({ loading: true, error: null });
       try {
-        const res = await getDashboard();
+        let pid = projectId;
+
+        if (!pid) {
+          const pr = await listProjects();
+          const first = (pr?.projects || pr || [])[0];
+          pid = first?.id || first?._id || "";
+          if (alive) setProjectId(pid);
+        }
+
+        if (!pid) throw new Error("No projects available for dashboard. Create a project first.");
+
+        const res = await getDashboard(pid);
         if (!alive) return;
+
         setData(res);
         setStatus({ loading: false, error: null });
       } catch (e) {
         if (!alive) return;
-        // Fallback: allow UI to still render even if backend doesn't implement dashboard yet.
+        // Fallback: allow UI to still render even if dashboard endpoint errors.
         setData(null);
         setStatus({ loading: false, error: e?.message || "Failed to load dashboard." });
       }
@@ -33,7 +47,7 @@ export default function DashboardPage() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [projectId]);
 
   const kpis = useMemo(() => {
     const src = data?.kpis || data;
@@ -74,9 +88,15 @@ export default function DashboardPage() {
           <p className="pageSubtitle">KPIs, execution health, and quick links.</p>
         </div>
         <div className="actions" aria-label="Quick actions">
-          <Link className="btn btnPrimary" to="/ai">Generate tests</Link>
-          <Link className="btn" to="/testcases">Browse test cases</Link>
-          <Link className="btn" to="/executions">Run automation</Link>
+          <Link className="btn btnPrimary" to="/ai">
+            Generate tests
+          </Link>
+          <Link className="btn" to="/testcases">
+            Browse test cases
+          </Link>
+          <Link className="btn" to="/executions">
+            Run automation
+          </Link>
         </div>
       </div>
 

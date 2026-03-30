@@ -3,25 +3,27 @@ import { apiRequest } from "./client";
 // PUBLIC_INTERFACE
 export async function listTestCases({ projectId, moduleId, tag, q } = {}) {
   /** List test cases with optional filters. */
+  if (!projectId) throw new Error("projectId is required to list test cases");
   const params = new URLSearchParams();
-  if (projectId) params.set("projectId", projectId);
   if (moduleId) params.set("moduleId", moduleId);
   if (tag) params.set("tag", tag);
   if (q) params.set("q", q);
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return apiRequest(`/testcases${suffix}`, { method: "GET" });
+  return apiRequest(`/projects/${encodeURIComponent(projectId)}/testcases${suffix}`, { method: "GET" });
 }
 
 // PUBLIC_INTERFACE
 export async function createTestCase(payload) {
   /** Create a test case. */
-  return apiRequest("/testcases", { method: "POST", body: payload });
+  const { projectId, ...body } = payload || {};
+  if (!projectId) throw new Error("projectId is required to create a test case");
+  return apiRequest(`/projects/${encodeURIComponent(projectId)}/testcases`, { method: "POST", body });
 }
 
 // PUBLIC_INTERFACE
 export async function updateTestCase(id, payload) {
   /** Update a test case. */
-  return apiRequest(`/testcases/${encodeURIComponent(id)}`, { method: "PUT", body: payload });
+  return apiRequest(`/testcases/${encodeURIComponent(id)}`, { method: "PATCH", body: payload });
 }
 
 // PUBLIC_INTERFACE

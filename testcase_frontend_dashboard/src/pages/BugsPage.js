@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { createBug, listBugs } from "../api/bugs";
+import { listProjects } from "../api/projects";
 
 // PUBLIC_INTERFACE
 export default function BugsPage() {
   /** Bug tracking linked to failed cases/executions. */
   const [items, setItems] = useState([]);
   const [status, setStatus] = useState({ loading: true, error: null });
+  const [projectId, setProjectId] = useState("");
 
   const [title, setTitle] = useState("");
   const [severity, setSeverity] = useState("medium");
@@ -16,7 +18,16 @@ export default function BugsPage() {
   async function load() {
     setStatus({ loading: true, error: null });
     try {
-      const res = await listBugs();
+      let pid = projectId;
+      if (!pid) {
+        const pr = await listProjects();
+        const first = (pr?.projects || pr || [])[0];
+        pid = first?.id || first?._id || "";
+        setProjectId(pid);
+      }
+      if (!pid) throw new Error("No projects available. Create a project first.");
+
+      const res = await listBugs({ projectId: pid });
       setItems(res?.bugs || res || []);
       setStatus({ loading: false, error: null });
     } catch (e) {
@@ -35,9 +46,10 @@ export default function BugsPage() {
     setCreating(true);
     try {
       await createBug({
+        projectId,
         title: title.trim(),
         severity,
-        testCaseId: testCaseId.trim() || null,
+        testcaseId: testCaseId.trim() || null,
         executionId: executionId.trim() || null
       });
       setTitle("");
